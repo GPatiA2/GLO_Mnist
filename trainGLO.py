@@ -6,6 +6,10 @@ from torch.utils.data import DataLoader
 import argparse
 import torch
 import os
+from torchviz import make_dot
+import cv2
+import numpy as np
+import torchinfo
 
 def options():
 
@@ -39,6 +43,10 @@ if __name__ == '__main__':
         os.path.join(opt.results_dir, 'losses'), exist_ok=True
     )
 
+    os.makedirs(
+        os.path.join(opt.results_dir, 'generated'), exist_ok=True
+    )
+
     dataset = MnistDataloader('mnist/train-images-idx3-ubyte/train-images-idx3-ubyte', 
                               'mnist/train-labels-idx1-ubyte/train-labels-idx1-ubyte',
                               'mnist/t10k-images-idx3-ubyte/t10k-images-idx3-ubyte', 
@@ -46,13 +54,29 @@ if __name__ == '__main__':
     
     train, test = dataset.load_data()
 
-    dataset = IndexedDataset(train[0])
+    real_dataset = []
+    for i in range(len(train[0])):
+        if train[1][i] in [7,1]:
+            real_dataset.append(train[0][i])
+
+    real_dataset = real_dataset[:len(real_dataset) // 2]
+
+    # cv2.imshow('img', np.uint8(real_dataset[0]))
+    # cv2.waitKey(0)
+
+    dataset = IndexedDataset(real_dataset)
 
     dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True)
 
-    model = Generator(opt.code_dim, opt.filters, opt.out_chan)
+    model = Generator(opt.code_dim, opt.filters, opt.out_chan, opt.batch_size)
 
-    criterion = torch.nn.MSELoss()
+    torchinfo.summary(model, (opt.batch_size, opt.code_dim))
+    input()
+
+    # make_dot(model.forward()).view()
+    # input()
+
+    criterion = torch.nn.MSELoss(reduction='sum')
 
     initializer = RandomCodeInitializer(opt.seed, opt.code_dim)
 
@@ -62,7 +86,8 @@ if __name__ == '__main__':
 
     callbacks = [
         Callback(lambda trainer: trainer.save_checkpoint(opt.results_dir), 2),
-        Callback(lambda trainer: trainer.save_losses(opt.results_dir), 10)
+        Callback(lambda trainer: trainer.save_losses(opt.results_dir), 5),
+        Callback(lambda trainer: trainer.show_generaed(), 5)
     ]
 
     trainer.train_for_epochs(opt.epochs, callbacks)

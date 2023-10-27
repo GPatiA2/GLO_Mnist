@@ -35,7 +35,7 @@ class MnistDataloader(object):
         for i in range(size):
             img = np.array(image_data[i * rows * cols:(i + 1) * rows * cols])
             img = img.reshape(28, 28)
-            img = cv2.resize(img, (64,64))
+            img = cv2.resize(img, (32,32))
             images[i][:] = img            
         
         return images, labels

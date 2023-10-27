@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 import numpy as np
+import torchvision
+import cv2
 
 class Callback():
 
@@ -25,7 +27,7 @@ class RandomCodeInitializer(Initializer):
 
     def initialize(self, dataset):
         torch.manual_seed(self.seed)
-        return torch.randn(len(dataset), self.dim, requires_grad=True)
+        return torch.randn(len(dataset), self.dim)
 
 
 class GLO_Trainer():
@@ -49,14 +51,13 @@ class GLO_Trainer():
     def set_optimizer(self, optimizer, lr, b1, b2):
         p = [
             {'params': self.model.parameters() , 'lr':lr},
-            {'params': self.z_codes, 'lr':lr}
         ]
         if optimizer == 'adam':
             self.optimizer = torch.optim.Adam(p, lr=lr, betas=(b1, b2))
         elif optimizer == 'sgd':
             self.optimizer = torch.optim.SGD(p, lr=lr, momentum=b1)
         else:
-            raise ValueError('Optimizer not supported')
+            raise ValueError('Optimizer ' + optimizer  + ' not supported')
 
     def get_codes(self, idx):
 
@@ -88,7 +89,7 @@ class GLO_Trainer():
             'optimizer_state_dict': self.optimizer.state_dict(),
             'train_losses': self.train_losses,
             'z_codes': self.z_codes
-        }, path + '/checkpoint_' + str(self.num_epoch) + '.pt')
+        }, path + '/checkpoints/' + str(self.num_epoch) + '.pt')
 
     def save_losses(self, path):
 
@@ -96,12 +97,23 @@ class GLO_Trainer():
         y = self.train_losses
 
         plt.plot(x, y)
-        plt.savefig(path + '/losses_' + str(self.num_epoch) + '.png')
-    
+        plt.savefig(path + '/losses/' + str(self.num_epoch) + '.png')
+
+    def show_generaed(self):
+        
+        print("Generating image...")
+        generated = self.model.forward(None)
+        imgs = generated.clone().detach().to('cpu')
+        grid_x = torchvision.utils.make_grid(imgs)
+        cv2.imwrite("glo_mnist/generated" + str(self.num_epoch) + '.png', grid_x.permute(1, 2, 0).numpy() * 255)
 
     def epoch(self):
 
         for batch in tqdm(self.dataloader):
+
+            if len(batch[1]) != self.batch_size:
+                print("Skipping batch of size " + str(len(batch[1])))
+                continue
 
             self.optimizer.zero_grad()
 
@@ -113,7 +125,9 @@ class GLO_Trainer():
 
             code = self.get_codes(idx)
 
-            reconstructed = torch.squeeze(self.model(code))
+            self.model.set_code(code)
+
+            reconstructed = torch.squeeze(self.model.forward(None))
 
             loss = torch.sum(torch.abs(image - reconstructed))
 
@@ -121,9 +135,9 @@ class GLO_Trainer():
 
             self.optimizer.step()
 
-            code = nn.functional.normalize(code, dim=0, p = 2)
+            n_codes = self.model.get_code_content()
 
-            # for i in range(len(idx)):
-            #     self.z_codes[idx[i]] = code[i]
+            for i in range(len(idx)):
+                self.z_codes[idx[i]] = n_codes[i]
 
             self.train_losses.append(loss.detach().to('cpu').numpy())
