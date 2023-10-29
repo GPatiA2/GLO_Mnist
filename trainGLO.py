@@ -87,7 +87,7 @@ if __name__ == '__main__':
     callbacks = [
         Callback(lambda trainer: trainer.save_checkpoint(opt.results_dir), 2),
         Callback(lambda trainer: trainer.save_losses(opt.results_dir), 5),
-        Callback(lambda trainer: trainer.show_generaed(), 5)
+        Callback(lambda trainer: trainer.show_generaed(opt.results_dir), 5)
     ]
 
     trainer.train_for_epochs(opt.epochs, callbacks)

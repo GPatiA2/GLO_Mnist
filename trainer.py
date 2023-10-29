@@ -99,13 +99,13 @@ class GLO_Trainer():
         plt.plot(x, y)
         plt.savefig(path + '/losses/' + str(self.num_epoch) + '.png')
 
-    def show_generaed(self):
+    def show_generaed(self, path):
         
         print("Generating image...")
         generated = self.model.forward(None)
         imgs = generated.clone().detach().to('cpu')
         grid_x = torchvision.utils.make_grid(imgs)
-        cv2.imwrite("glo_mnist/generated" + str(self.num_epoch) + '.png', grid_x.permute(1, 2, 0).numpy() * 255)
+        cv2.imwrite(path + "/generated/" + str(self.num_epoch) + '.png', grid_x.permute(1, 2, 0).numpy() * 255)
 
     def epoch(self):
 
